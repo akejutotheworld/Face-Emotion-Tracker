@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Detection App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Emotion Detection System</h1>
+            <p>Detect emotions from uploaded images using AI</p>
+        </header>
+
+        <div class="input-section">
+            <div class="form-group">
+                <label for="userName">Your Name:</label>
+                <input type="text" id="userName" placeholder="Enter your name" value="">
+            </div>
+
+            <div class="form-group">
+                <label for="matricNumber">Matriculation Number:</label>
+                <input type="text" id="matricNumber" placeholder="Enter your matric number" value="">
+            </div>
+
+            <div class="upload-area" id="uploadArea">
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                <div class="upload-placeholder">
+                    <span class="upload-icon">↑</span>
+                    <p>Click to upload or drag and drop</p>
+                    <p class="upload-hint">Supports: JPG, PNG, GIF</p>
+                </div>
+                <img id="previewImage" style="display: none; max-width: 100%; max-height: 400px;">
+            </div>
+            <button id="analyzeBtn" class="btn btn-primary" onclick="analyzeImage()" disabled>
+                Analyze Emotion
+            </button>
+        </div>
+
+        <div id="results" class="results" style="display: none;">
+            <h2>Detection Results</h2>
+            <div class="result-card">
+                <div class="emotion-display">
+                    <h3 id="emotionText">Happy</h3>
+                    <p class="confidence">Confidence: <span id="confidenceValue">95%</span></p>
+                </div>
+                <div class="emotion-breakdown">
+                    <h4>All Emotions:</h4>
+                    <div id="emotionBars"></div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Emotion Detection Web App | Built with TensorFlow & Flask</p>
+        </footer>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const imageInput = document.getElementById('imageInput');
+        const previewImage = document.getElementById('previewImage');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+
+        uploadArea.addEventListener('click', () => imageInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#4CAF50';
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.borderColor = '#ddd';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ddd';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleImageSelect(files[0]);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleImageSelect(e.target.files[0]);
+            }
+        });
+
+        function handleImageSelect(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewImage.style.display = 'block';
+                document.querySelector('.upload-placeholder').style.display = 'none';
+                analyzeBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function analyzeImage() {
+            const imageData = previewImage.src;
+            const userName = document.getElementById('userName').value || 'Anonymous';
+            const matricNumber = document.getElementById('matricNumber').value || 'N/A';
+            
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: userName,
+                        matric_number: matricNumber,
+                        image: imageData,
+                        type: 'upload'
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    alert('Error: ' + result.error);
+                    return;
+                }
+
+                displayResults(result);
+            } catch (error) {
+                alert('Error analyzing image: ' + error.message);
+            }
+        }
+
+        function displayResults(result) {
+            document.getElementById('emotionText').textContent = result.emotion;
+            document.getElementById('confidenceValue').textContent = result.confidence.toFixed(2) + '%';
+            
+            const emotionBars = document.getElementById('emotionBars');
+            emotionBars.innerHTML = '';
+            
+            const sortedEmotions = Object.entries(result.all_emotions)
+                .sort((a, b) => b[1] - a[1]);
+            
+            sortedEmotions.forEach(([emotion, confidence]) => {
+                const barContainer = document.createElement('div');
+                barContainer.className = 'emotion-bar-container';
+                
+                const label = document.createElement('span');
+                label.className = 'emotion-label';
+                label.textContent = emotion;
+                
+                const barWrapper = document.createElement('div');
+                barWrapper.className = 'emotion-bar-wrapper';
+                
+                const bar = document.createElement('div');
+                bar.className = 'emotion-bar';
+                bar.style.width = confidence + '%';
+                
+                const value = document.createElement('span');
+                value.className = 'emotion-value';
+                value.textContent = confidence.toFixed(1) + '%';
+                
+                barWrapper.appendChild(bar);
+                barContainer.appendChild(label);
+                barContainer.appendChild(barWrapper);
+                barContainer.appendChild(value);
+                emotionBars.appendChild(barContainer);
+            });
+            
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
